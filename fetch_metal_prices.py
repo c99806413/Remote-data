@@ -3,7 +3,6 @@ import os
 from datetime import datetime, timedelta
 import akshare as ak
 import pandas as pd
-import time
 
 # ============================================================
 # 配置
@@ -31,48 +30,66 @@ SYMBOLS = {
 HISTORY_DAYS = 365
 
 # ============================================================
-# 核心获取函数（逐个品种，更稳定）
+# 核心获取函数（使用 futures_zh_spot_sina）
 # ============================================================
 
-def fetch_main_contract(symbol):
-    """使用 futures_zh_main_sina 获取主力连续合约数据"""
+def fetch_futures_spot_sina(symbol):
+    """
+    使用 AKShare 的 futures_zh_spot_sina 获取该品种所有合约的实时行情
+    返回 DataFrame，含该品种所有合约
+    """
     try:
-        df = ak.futures_zh_main_sina(symbol=symbol)
+        df = ak.futures_zh_spot_sina(symbol=symbol)
         if df is None or df.empty:
             return None
-        # 取最新一行
-        latest = df.iloc[-1]
-        price = latest.get('最新价', 0)
-        if price == 0 or pd.isna(price):
+        # 过滤最新价 <= 0 的无效数据
+        df = df[df['最新价'] > 0]
+        if df.empty:
             return None
-        return {
-            'price': float(price),
-            'volume': int(latest.get('成交量', 0)) if not pd.isna(latest.get('成交量', 0)) else 0,
-            'open': float(latest.get('开盘价', 0)) if not pd.isna(latest.get('开盘价', 0)) else 0,
-            'high': float(latest.get('最高价', 0)) if not pd.isna(latest.get('最高价', 0)) else 0,
-            'low': float(latest.get('最低价', 0)) if not pd.isna(latest.get('最低价', 0)) else 0,
-            'prev_close': float(latest.get('昨收价', 0)) if not pd.isna(latest.get('昨收价', 0)) else 0,
-            'change': float(latest.get('涨跌额', 0)) if not pd.isna(latest.get('涨跌额', 0)) else 0,
-            'change_pct': str(latest.get('涨跌幅', '0')) if not pd.isna(latest.get('涨跌幅', '')) else '0',
-        }
+        return df
     except Exception as e:
-        print(f'  异常: {e}')
+        print(f' 异常: {e}')
         return None
 
-def fetch_gold_spot():
-    """获取黄金现货价格（AU9999）"""
-    try:
-        df = ak.spot_gold()
-        if df is None or df.empty:
-            return None
-        latest = df.iloc[-1]
-        price = float(latest['最新价'])
-        if price <= 0:
-            return None
-        return price
-    except Exception as e:
-        print(f'  黄金现货异常: {e}')
+def get_main_contract_from_df(df):
+    """
+    从 DataFrame 中提取主力合约（成交量最大）
+    返回一条 Series
+    """
+    if df is None or df.empty:
         return None
+    # 按成交量降序
+    main = df.sort_values('成交量', ascending=False).iloc[0]
+    return main
+
+def fetch_gold_spot():
+    """
+    尝试获取黄金现货价格（AU9999）
+    """
+    try:
+        # 注意：不同版本函数名可能不同，尝试几种常见写法
+        if hasattr(ak, 'spot_gold'):
+            df = ak.spot_gold()
+        elif hasattr(ak, 'gold_spot'):
+            df = ak.gold_spot()
+        elif hasattr(ak, 'gold_spot_df'):
+            df = ak.gold_spot_df()
+        else:
+            return None
+        if df is not None and not df.empty:
+            # 取最新价（可能在不同列）
+            if '最新价' in df.columns:
+                price = float(df['最新价'].iloc[-1])
+            elif 'price' in df.columns:
+                price = float(df['price'].iloc[-1])
+            else:
+                # 尝试取第一列数值
+                price = float(df.iloc[-1, 1])
+            if price > 0:
+                return price
+    except Exception as e:
+        print(f' 黄金现货异常: {e}')
+    return None
 
 # ============================================================
 # 主流程
@@ -88,13 +105,13 @@ def fetch_all_metals():
     for symbol, info in SYMBOLS.items():
         print(f'📊 获取 {info["name"]} ({symbol})...', end=' ')
 
-        # 黄金优先用现货
+        # 黄金特殊处理：优先现货
         if symbol == 'AU':
-            gold_spot = fetch_gold_spot()
-            if gold_spot:
+            gold_price = fetch_gold_spot()
+            if gold_price:
                 results[symbol] = {
                     'name': info['name'],
-                    'price': gold_spot,
+                    'price': gold_price,
                     'unit': info['unit'],
                     'group': info['group'],
                     'change': 0,
@@ -106,39 +123,40 @@ def fetch_all_metals():
                     'contract': 'AU9999现货',
                 }
                 success_count += 1
-                print(f'✅ {gold_spot:,.2f} {info["unit"]} (现货)')
+                print(f'✅ {gold_price:,.2f} {info["unit"]} (现货)')
                 continue
 
-        # 其他品种使用期货主力
-        data = fetch_main_contract(symbol)
-        if data:
-            results[symbol] = {
-                'name': info['name'],
-                'price': data['price'],
-                'unit': info['unit'],
-                'group': info['group'],
-                'change': data['change'],
-                'change_pct': data['change_pct'],
-                'open': data['open'],
-                'high': data['high'],
-                'low': data['low'],
-                'prev_close': data['prev_close'],
-                'contract': '主力连续',
-            }
-            success_count += 1
-            print(f'✅ {data["price"]:,.2f} {info["unit"]}')
-        else:
-            print('❌ 无数据')
+        # 期货数据获取
+        df = fetch_futures_spot_sina(symbol)
+        if df is not None:
+            main = get_main_contract_from_df(df)
+            if main is not None:
+                # 提取字段
+                results[symbol] = {
+                    'name': info['name'],
+                    'price': float(main['最新价']),
+                    'unit': info['unit'],
+                    'group': info['group'],
+                    'change': float(main['涨跌额']) if '涨跌额' in main else 0,
+                    'change_pct': str(main['涨跌幅']) if '涨跌幅' in main else '0',
+                    'open': float(main['今开']) if '今开' in main else 0,
+                    'high': float(main['最高']) if '最高' in main else 0,
+                    'low': float(main['最低']) if '最低' in main else 0,
+                    'prev_close': float(main['昨收']) if '昨收' in main else 0,
+                    'contract': main['合约'] if '合约' in main else '',
+                }
+                success_count += 1
+                print(f'✅ {results[symbol]["price"]:,.2f} {info["unit"]}')
+                continue
 
-        # 避免请求过快，加一个小延迟
-        time.sleep(0.2)
+        print('❌ 无数据')
 
     print('=' * 60)
     print(f'✅ 成功获取 {success_count}/{len(SYMBOLS)} 个品种')
     return results
 
 # ============================================================
-# 保存与更新
+# 保存与更新（与之前相同）
 # ============================================================
 
 def update_latest(data):
@@ -149,8 +167,8 @@ def update_latest(data):
         'timestamp': datetime.utcnow().isoformat() + 'Z',
         'date': datetime.utcnow().strftime('%Y-%m-%d'),
         'time': datetime.now().strftime('%H:%M:%S'),
-        'source': 'AKShare (期货主力 + 黄金现货)',
-        'note': '黄金使用AU9999现货，其他为期货主力连续合约',
+        'source': 'AKShare (上海期货交易所 + 上海黄金交易所)',
+        'note': '主力合约自动识别，黄金优先使用AU9999现货',
         'rates': data
     }
     with open('data/metal_prices.json', 'w', encoding='utf-8') as f:
@@ -186,9 +204,7 @@ def print_summary(data):
     print('📊 行情汇总')
     print('=' * 60)
     for symbol, info in data.items():
-        unit = info.get('unit', '')
-        price = info.get('price', 0)
-        print(f'  {info["name"]}：{price:,.2f} {unit}')
+        print(f'  {info["name"]}：{info["price"]:,.2f} {info["unit"]}')
     print('=' * 60)
 
 def main():

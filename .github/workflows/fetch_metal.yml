@@ -20,4 +20,3 @@ jobs:
         with:
           commit_message: "自动更新金属价格"
           file_pattern: "data/*.json"
-          token: ${{ secrets.PAT }}

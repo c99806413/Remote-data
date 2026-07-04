@@ -1,95 +1,112 @@
+import requests
 import json
 import os
 from datetime import datetime, timedelta
-import akshare as ak
-import pandas as pd
 
 # ============================================================
 # 配置
 # ============================================================
 
+# 品种代码与合理价格区间
 SYMBOLS = {
-    'CU': {'name': '沪铜', 'unit': '元/吨', 'group': '有色金属'},
-    'AL': {'name': '沪铝', 'unit': '元/吨', 'group': '有色金属'},
-    'ZN': {'name': '沪锌', 'unit': '元/吨', 'group': '有色金属'},
-    'PB': {'name': '沪铅', 'unit': '元/吨', 'group': '有色金属'},
-    'NI': {'name': '沪镍', 'unit': '元/吨', 'group': '有色金属'},
-    'SN': {'name': '沪锡', 'unit': '元/吨', 'group': '有色金属'},
-    'AU': {'name': '沪金', 'unit': '元/克', 'group': '贵金属'},
-    'AG': {'name': '沪银', 'unit': '元/千克', 'group': '贵金属'},
-    'RB': {'name': '螺纹钢', 'unit': '元/吨', 'group': '钢材'},
-    'HC': {'name': '热轧卷板', 'unit': '元/吨', 'group': '钢材'},
-    'WR': {'name': '线材', 'unit': '元/吨', 'group': '钢材'},
-    'SS': {'name': '不锈钢', 'unit': '元/吨', 'group': '钢材'},
-    'I': {'name': '铁矿石', 'unit': '元/吨', 'group': '钢材'},
-    'SI': {'name': '工业硅', 'unit': '元/吨', 'group': '新能源'},
-    'LC': {'name': '碳酸锂', 'unit': '元/吨', 'group': '新能源'},
-    'AO': {'name': '氧化铝', 'unit': '元/吨', 'group': '有色金属'},
+    'CU0': {'name': '沪铜', 'unit': '元/吨', 'min_val': 60000, 'max_val': 90000},
+    'AL0': {'name': '沪铝', 'unit': '元/吨', 'min_val': 16000, 'max_val': 25000},
+    'ZN0': {'name': '沪锌', 'unit': '元/吨', 'min_val': 18000, 'max_val': 30000},
+    'PB0': {'name': '沪铅', 'unit': '元/吨', 'min_val': 14000, 'max_val': 22000},
+    'NI0': {'name': '沪镍', 'unit': '元/吨', 'min_val': 100000, 'max_val': 200000},
+    'SN0': {'name': '沪锡', 'unit': '元/吨', 'min_val': 150000, 'max_val': 300000},
+    'AU0': {'name': '沪金', 'unit': '元/克', 'min_val': 800, 'max_val': 1000},
+    'AG0': {'name': '沪银', 'unit': '元/千克', 'min_val': 14000, 'max_val': 18000},
+    'RB0': {'name': '螺纹钢', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4000},
+    'HC0': {'name': '热轧卷板', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
+    'WR0': {'name': '线材', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
+    'I0': {'name': '铁矿石', 'unit': '元/吨', 'min_val': 600, 'max_val': 1000},
+    'SS0': {'name': '不锈钢', 'unit': '元/吨', 'min_val': 12000, 'max_val': 20000},
+    'SI0': {'name': '工业硅', 'unit': '元/吨', 'min_val': 10000, 'max_val': 20000},
+    'LC0': {'name': '碳酸锂', 'unit': '元/吨', 'min_val': 50000, 'max_val': 150000},
+    'AO0': {'name': '氧化铝', 'unit': '元/吨', 'min_val': 2500, 'max_val': 5000},
 }
 
 HISTORY_DAYS = 365
 
 # ============================================================
-# 核心获取函数（使用 futures_zh_spot_sina）
+# 核心获取函数
 # ============================================================
 
-def fetch_futures_spot_sina(symbol):
+def fetch_sina(symbol):
     """
-    使用 AKShare 的 futures_zh_spot_sina 获取该品种所有合约的实时行情
-    返回 DataFrame，含该品种所有合约
+    从新浪财经获取指定品种的数据
+    必须带 Referer 头，否则返回 Forbidden
     """
+    url = f'https://hq.sinajs.cn/list={symbol}'
+    headers = {
+        'Referer': 'https://finance.sina.com.cn/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
     try:
-        df = ak.futures_zh_spot_sina(symbol=symbol)
-        if df is None or df.empty:
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.encoding = 'gbk'
+        if resp.status_code != 200:
             return None
-        # 过滤最新价 <= 0 的无效数据
-        df = df[df['最新价'] > 0]
-        if df.empty:
+        text = resp.text.strip()
+        if not text or '404' in text or 'Forbidden' in text:
             return None
-        return df
+        return text
     except Exception as e:
-        print(f' 异常: {e}')
+        print(f' 请求异常: {e}')
         return None
 
-def get_main_contract_from_df(df):
+def parse_sina(raw, symbol):
     """
-    从 DataFrame 中提取主力合约（成交量最大）
-    返回一条 Series
-    """
-    if df is None or df.empty:
-        return None
-    # 按成交量降序
-    main = df.sort_values('成交量', ascending=False).iloc[0]
-    return main
-
-def fetch_gold_spot():
-    """
-    尝试获取黄金现货价格（AU9999）
+    解析新浪返回的原始数据，并进行严格校验
     """
     try:
-        # 注意：不同版本函数名可能不同，尝试几种常见写法
-        if hasattr(ak, 'spot_gold'):
-            df = ak.spot_gold()
-        elif hasattr(ak, 'gold_spot'):
-            df = ak.gold_spot()
-        elif hasattr(ak, 'gold_spot_df'):
-            df = ak.gold_spot_df()
-        else:
+        start = raw.find('"')
+        end = raw.rfind('"')
+        if start == -1 or end == -1:
             return None
-        if df is not None and not df.empty:
-            # 取最新价（可能在不同列）
-            if '最新价' in df.columns:
-                price = float(df['最新价'].iloc[-1])
-            elif 'price' in df.columns:
-                price = float(df['price'].iloc[-1])
-            else:
-                # 尝试取第一列数值
-                price = float(df.iloc[-1, 1])
-            if price > 0:
-                return price
+        parts = raw[start+1:end].split(',')
+        if len(parts) < 8:
+            return None
+
+        # 字段索引：0:名称, 1:最新价, 2:涨跌, 3:涨跌幅, 4:今开, 5:最高, 6:最低, 7:昨收
+        # 尝试从多个字段取值，优先用最新价，如果异常则尝试昨收或今开
+        price = None
+        # 候选字段顺序：最新价、昨收、今开
+        candidates = [
+            parts[1] if len(parts) > 1 else '',
+            parts[7] if len(parts) > 7 else '',
+            parts[4] if len(parts) > 4 else ''
+        ]
+        for val in candidates:
+            if val and val != '0':
+                try:
+                    p = float(val)
+                    # 检查该品种的合理区间
+                    info = SYMBOLS.get(symbol)
+                    if info and info['min_val'] <= p <= info['max_val']:
+                        price = p
+                        break
+                except:
+                    continue
+
+        if price is None:
+            return None
+
+        # 提取其他字段
+        return {
+            'price': price,
+            'change': float(parts[2]) if len(parts) > 2 and parts[2] else 0,
+            'change_pct': parts[3] if len(parts) > 3 else '0',
+            'open': float(parts[4]) if len(parts) > 4 and parts[4] else 0,
+            'high': float(parts[5]) if len(parts) > 5 and parts[5] else 0,
+            'low': float(parts[6]) if len(parts) > 6 and parts[6] else 0,
+            'prev_close': float(parts[7]) if len(parts) > 7 and parts[7] else 0,
+            'name': parts[0] if parts[0] else ''
+        }
     except Exception as e:
-        print(f' 黄金现货异常: {e}')
-    return None
+        print(f' 解析异常: {e}')
+        return None
 
 # ============================================================
 # 主流程
@@ -99,57 +116,30 @@ def fetch_all_metals():
     results = {}
     success_count = 0
 
-    print('🔄 开始获取金属价格数据 (逐个合约)')
+    print('🔄 开始获取金属价格数据 (新浪HTTP)')
     print('=' * 60)
 
     for symbol, info in SYMBOLS.items():
         print(f'📊 获取 {info["name"]} ({symbol})...', end=' ')
-
-        # 黄金特殊处理：优先现货
-        if symbol == 'AU':
-            gold_price = fetch_gold_spot()
-            if gold_price:
+        raw = fetch_sina(symbol)
+        if raw:
+            parsed = parse_sina(raw, symbol)
+            if parsed:
                 results[symbol] = {
                     'name': info['name'],
-                    'price': gold_price,
+                    'price': parsed['price'],
                     'unit': info['unit'],
-                    'group': info['group'],
-                    'change': 0,
-                    'change_pct': '0',
-                    'open': 0,
-                    'high': 0,
-                    'low': 0,
-                    'prev_close': 0,
-                    'contract': 'AU9999现货',
+                    'change': parsed['change'],
+                    'change_pct': parsed['change_pct'],
+                    'open': parsed['open'],
+                    'high': parsed['high'],
+                    'low': parsed['low'],
+                    'prev_close': parsed['prev_close'],
                 }
                 success_count += 1
-                print(f'✅ {gold_price:,.2f} {info["unit"]} (现货)')
+                print(f'✅ {parsed["price"]:,.2f} {info["unit"]}')
                 continue
-
-        # 期货数据获取
-        df = fetch_futures_spot_sina(symbol)
-        if df is not None:
-            main = get_main_contract_from_df(df)
-            if main is not None:
-                # 提取字段
-                results[symbol] = {
-                    'name': info['name'],
-                    'price': float(main['最新价']),
-                    'unit': info['unit'],
-                    'group': info['group'],
-                    'change': float(main['涨跌额']) if '涨跌额' in main else 0,
-                    'change_pct': str(main['涨跌幅']) if '涨跌幅' in main else '0',
-                    'open': float(main['今开']) if '今开' in main else 0,
-                    'high': float(main['最高']) if '最高' in main else 0,
-                    'low': float(main['最低']) if '最低' in main else 0,
-                    'prev_close': float(main['昨收']) if '昨收' in main else 0,
-                    'contract': main['合约'] if '合约' in main else '',
-                }
-                success_count += 1
-                print(f'✅ {results[symbol]["price"]:,.2f} {info["unit"]}')
-                continue
-
-        print('❌ 无数据')
+        print('❌')
 
     print('=' * 60)
     print(f'✅ 成功获取 {success_count}/{len(SYMBOLS)} 个品种')
@@ -167,8 +157,8 @@ def update_latest(data):
         'timestamp': datetime.utcnow().isoformat() + 'Z',
         'date': datetime.utcnow().strftime('%Y-%m-%d'),
         'time': datetime.now().strftime('%H:%M:%S'),
-        'source': 'AKShare (上海期货交易所 + 上海黄金交易所)',
-        'note': '主力合约自动识别，黄金优先使用AU9999现货',
+        'source': '新浪财经',
+        'note': '数据延迟约15分钟，已进行合理性校验',
         'rates': data
     }
     with open('data/metal_prices.json', 'w', encoding='utf-8') as f:
@@ -209,7 +199,7 @@ def print_summary(data):
 
 def main():
     print('=' * 60)
-    print('📊 金属期货价格获取工具 (AKShare)')
+    print('📊 金属期货价格获取工具 (新浪HTTP)')
     print('=' * 60)
     print(f'⏰ 获取时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     print('')

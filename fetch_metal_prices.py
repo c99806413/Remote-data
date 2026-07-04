@@ -48,17 +48,27 @@ def parse_sina(raw):
         parts = raw[start+1:end].split(',')
         if len(parts) < 8:
             return None
-        price = parts[1]
-        if not price or price == '0':
+        
+        # 尝试从多个字段中找价格
+        price = None
+        for idx in [7, 4, 1]:  # 优先昨收，其次今开，再次最新价
+            if idx < len(parts) and parts[idx] and parts[idx] != '0':
+                val = float(parts[idx])
+                if 100 < val < 10000:  # 黄金正常范围 100-1000 元/克
+                    price = val
+                    break
+        
+        if price is None:
             return None
+        
         return {
-            'price': float(price),
-            'change': float(parts[2]) if parts[2] else 0,
-            'change_pct': parts[3] if parts[3] else '0',
-            'open': float(parts[4]) if parts[4] else 0,
-            'high': float(parts[5]) if parts[5] else 0,
-            'low': float(parts[6]) if parts[6] else 0,
-            'prev_close': float(parts[7]) if parts[7] else 0,
+            'price': price,
+            'change': float(parts[2]) if len(parts) > 2 and parts[2] else 0,
+            'change_pct': parts[3] if len(parts) > 3 else '0',
+            'open': float(parts[4]) if len(parts) > 4 and parts[4] else 0,
+            'high': float(parts[5]) if len(parts) > 5 and parts[5] else 0,
+            'low': float(parts[6]) if len(parts) > 6 and parts[6] else 0,
+            'prev_close': float(parts[7]) if len(parts) > 7 and parts[7] else 0,
         }
     except:
         return None

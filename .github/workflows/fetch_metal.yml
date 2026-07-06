@@ -2,7 +2,7 @@ name: 每日获取金属价格
 
 on:
   schedule:
-    - cron: '30 9 * * *'   # 每天 UTC 09:30（北京时间 17:30）
+    - cron: '0 10 * * *'   # 每天 UTC 10:00（北京时间 18:00）
   workflow_dispatch:
 
 jobs:

@@ -29,3 +29,11 @@ jobs:
           commit_message: "🤖 [SHFE] 自动更新金属价格"
           file_pattern: "data/*.json"
           push_options: '--force'
+
+      # ========== 自动更新 latest Tag（让 CDN 立即刷新） ==========
+      - name: 更新 latest tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f latest
+          git push -f origin latest

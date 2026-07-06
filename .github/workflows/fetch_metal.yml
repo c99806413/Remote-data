@@ -2,7 +2,7 @@ name: 每日获取金属价格
 
 on:
   schedule:
-    - cron: '30 2 * * *'   # 每天 UTC 02:30（北京时间 10:30），交易时段内
+    - cron: '30 16 * * *'   # 每天 UTC 16:30（北京时间次日 00:30），收盘后更新
   workflow_dispatch:
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
       - name: 安装依赖
         run: |
           pip install --upgrade pip
-          pip install akshare pandas requests
+          pip install akshare pandas
 
       - name: 运行脚本
         run: python fetch_metal_prices.py
@@ -28,6 +28,6 @@ jobs:
       - name: 提交更改
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "🤖 自动更新金属价格"
+          commit_message: "🤖 自动更新金属价格 (akshare)"
           file_pattern: "data/*.json"
           push_options: '--force'

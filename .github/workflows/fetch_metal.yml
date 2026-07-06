@@ -2,8 +2,8 @@ name: 每日获取金属价格
 
 on:
   schedule:
-    - cron: '30 8 * * *'   # 每天 UTC 08:30（北京时间 16:30），收盘后执行
-  workflow_dispatch:       # 保留手动触发按钮，方便你测试
+    - cron: '30 9 * * *'   # 每天 UTC 09:30（北京时间 17:30）
+  workflow_dispatch:
 
 jobs:
   fetch:
@@ -18,11 +18,9 @@ jobs:
           python-version: '3.10'
 
       - name: 安装依赖
-        run: |
-          pip install --upgrade pip
-          pip install requests
+        run: pip install requests
 
-      - name: 运行抓取脚本
+      - name: 运行脚本
         run: python fetch_metal_prices.py
 
       - name: 提交更改

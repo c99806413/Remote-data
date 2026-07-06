@@ -1,161 +1,203 @@
+import requests
 import json
 import os
 from datetime import datetime, timedelta
-import akshare as ak
-import pandas as pd
+import time
 
 # ============================================================
 # 配置
 # ============================================================
 
-# 品种代码映射（akshare 返回的 product 字段是大写代码，如 'CU', 'AU', 'AG'）
+# 新浪财经期货代码（0 表示主力连续合约）
+# 新浪接口支持 AU0（沪金）和 AG0（沪银），之前抓不到是因为解析逻辑没适配
 SYMBOLS = {
-    'CU': {'name': '沪铜', 'unit': '元/吨', 'min_val': 60000, 'max_val': 90000},
-    'AL': {'name': '沪铝', 'unit': '元/吨', 'min_val': 16000, 'max_val': 25000},
-    'ZN': {'name': '沪锌', 'unit': '元/吨', 'min_val': 18000, 'max_val': 30000},
-    'PB': {'name': '沪铅', 'unit': '元/吨', 'min_val': 14000, 'max_val': 22000},
-    'NI': {'name': '沪镍', 'unit': '元/吨', 'min_val': 100000, 'max_val': 200000},
-    'SN': {'name': '沪锡', 'unit': '元/吨', 'min_val': 150000, 'max_val': 300000},
-    'AU': {'name': '沪金', 'unit': '元/克', 'min_val': 800, 'max_val': 1000},       # ✅ 黄金
-    'AG': {'name': '沪银', 'unit': '元/千克', 'min_val': 14000, 'max_val': 18000},  # ✅ 白银
-    'RB': {'name': '螺纹钢', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4000},
-    'HC': {'name': '热轧卷板', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
-    'WR': {'name': '线材', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
-    'I': {'name': '铁矿石', 'unit': '元/吨', 'min_val': 600, 'max_val': 1000},
-    'SS': {'name': '不锈钢', 'unit': '元/吨', 'min_val': 12000, 'max_val': 20000},
-    'SI': {'name': '工业硅', 'unit': '元/吨', 'min_val': 10000, 'max_val': 20000},
-    'LC': {'name': '碳酸锂', 'unit': '元/吨', 'min_val': 50000, 'max_val': 150000},
-    'AO': {'name': '氧化铝', 'unit': '元/吨', 'min_val': 2500, 'max_val': 5000},
+    'CU0': {'name': '沪铜', 'unit': '元/吨', 'min_val': 60000, 'max_val': 90000},
+    'AL0': {'name': '沪铝', 'unit': '元/吨', 'min_val': 16000, 'max_val': 25000},
+    'ZN0': {'name': '沪锌', 'unit': '元/吨', 'min_val': 18000, 'max_val': 30000},
+    'PB0': {'name': '沪铅', 'unit': '元/吨', 'min_val': 14000, 'max_val': 22000},
+    'NI0': {'name': '沪镍', 'unit': '元/吨', 'min_val': 100000, 'max_val': 200000},
+    'SN0': {'name': '沪锡', 'unit': '元/吨', 'min_val': 150000, 'max_val': 300000},
+    'AU0': {'name': '沪金', 'unit': '元/克', 'min_val': 800, 'max_val': 1000},      # ✅ 黄金主力
+    'AG0': {'name': '沪银', 'unit': '元/千克', 'min_val': 14000, 'max_val': 18000}, # ✅ 白银主力
+    'RB0': {'name': '螺纹钢', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4000},
+    'HC0': {'name': '热轧卷板', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
+    'WR0': {'name': '线材', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
+    'I0': {'name': '铁矿石', 'unit': '元/吨', 'min_val': 600, 'max_val': 1000},
+    'SS0': {'name': '不锈钢', 'unit': '元/吨', 'min_val': 12000, 'max_val': 20000},
+    'SI0': {'name': '工业硅', 'unit': '元/吨', 'min_val': 10000, 'max_val': 20000},
+    'LC0': {'name': '碳酸锂', 'unit': '元/吨', 'min_val': 50000, 'max_val': 150000},
+    'AO0': {'name': '氧化铝', 'unit': '元/吨', 'min_val': 2500, 'max_val': 5000},
 }
 
 HISTORY_DAYS = 365
 
 # ============================================================
-# 核心获取函数（使用 akshare get_futures_daily）
+# 核心获取函数（新浪财经 HTTP，直连）
 # ============================================================
 
-def fetch_akshare():
+def fetch_sina(symbol):
     """
-    使用 akshare 的 get_futures_daily 获取上期所日度数据
+    从新浪财经获取指定品种的数据
+    必须带 Referer 和 User-Agent，否则返回 Forbidden
     """
-    results = {}
-    
+    url = f'https://hq.sinajs.cn/list={symbol}'
+    headers = {
+        'Referer': 'https://finance.sina.com.cn/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
     try:
-        # 获取最近一个交易日的数据
-        # 日期格式可以是 "YYYYMMDD" 或 "YYYY-MM-DD"
-        today = datetime.now()
-        end_date = today.strftime("%Y%m%d")
-        # 往前推5天，确保覆盖到最近一个交易日
-        start_date = (today - timedelta(days=10)).strftime("%Y%m%d")
-        
-        print(f"📅 获取日期范围: {start_date} 至 {end_date}")
-        print("📊 正在调用 get_futures_daily(market='SHFE')...")
-        
-        # 正确的函数名是 get_futures_daily[reference:4]
-        df = ak.get_futures_daily(
-            start_date=start_date,
-            end_date=end_date,
-            market="SHFE"  # 上期所
-        )
-        
-        if df is None or df.empty:
-            print("❌ get_futures_daily 返回空数据")
-            return results
-        
-        print(f"✅ 成功获取 {len(df)} 条数据记录")
-        print(f"📋 数据字段: {df.columns.tolist()}")
-        
-        # 获取所有品种列表
-        products = df['product'].unique().tolist() if 'product' in df.columns else []
-        print(f"📋 品种列表: {products}")
-        
-        # 获取最新日期
-        if 'date' in df.columns:
-            latest_date = df['date'].max()
-            print(f"📅 最新数据日期: {latest_date}")
-            # 只保留最新一天的数据
-            df_latest = df[df['date'] == latest_date]
-        else:
-            # 如果没有 date 列，按日期索引取最后一天
-            df_latest = df.groupby('product').last().reset_index()
-        
-        # 按品种分组，取每个品种的最新记录
-        # 如果有多个合约，取成交量最大的作为主力
-        if 'volume' in df_latest.columns:
-            df_main = df_latest.sort_values(['product', 'volume'], ascending=[True, False])
-            df_main = df_main.drop_duplicates(subset=['product'], keep='first')
-        else:
-            df_main = df_latest.drop_duplicates(subset=['product'], keep='first')
-        
-        print(f"📋 主力合约品种: {df_main['product'].tolist() if 'product' in df_main.columns else '未知'}")
-        
-        # 遍历每个品种
-        for _, row in df_main.iterrows():
-            code = row['product']  # 大写代码，如 'CU', 'AU', 'AG'
-            
-            # 只处理我们配置的品种
-            if code not in SYMBOLS:
-                continue
-            
-            info = SYMBOLS[code]
-            
-            # 提取价格数据
-            price = float(row['close']) if pd.notna(row['close']) else 0
-            open_price = float(row['open']) if pd.notna(row['open']) else 0
-            high = float(row['high']) if pd.notna(row['high']) else 0
-            low = float(row['low']) if pd.notna(row['low']) else 0
-            prev_close = float(row['pre_close']) if pd.notna(row['pre_close']) else 0
-            volume = float(row['volume']) if pd.notna(row['volume']) else 0
-            
-            # 计算涨跌额和涨跌幅
-            change = price - prev_close if prev_close > 0 else 0
-            change_pct = (change / prev_close * 100) if prev_close > 0 else 0
-            
-            # 合理性校验
-            if info['min_val'] <= price <= info['max_val']:
-                results[code] = {
-                    'name': info['name'],
-                    'price': price,
-                    'unit': info['unit'],
-                    'change': change,
-                    'change_pct': f"{change_pct:.2f}",
-                    'open': open_price,
-                    'high': high,
-                    'low': low,
-                    'prev_close': prev_close,
-                    'volume': volume,
-                    'contract': row.get('symbol', ''),
-                    'date': row.get('date', '')
-                }
-                arrow = '↑' if change_pct > 0 else '↓' if change_pct < 0 else '→'
-                print(f"  ✅ {info['name']}: {price:.2f} {info['unit']} {arrow} {abs(change_pct):.2f}%")
-            else:
-                print(f"  ⚠️ {info['name']} 价格 {price} 超出合理区间 [{info['min_val']}, {info['max_val']}]，跳过")
-        
-        print(f"✅ 成功获取 {len(results)} 个品种的数据")
-        return results
-        
-    except AttributeError as e:
-        print(f"❌ 函数不存在: {e}")
-        print("💡 请确认 akshare 版本: pip show akshare")
-        print("💡 如果版本过旧，请升级: pip install akshare --upgrade")
-        return results
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.encoding = 'gbk'
+        if resp.status_code != 200:
+            print(f'  HTTP {resp.status_code}')
+            return None
+        text = resp.text.strip()
+        if not text or '404' in text or 'Forbidden' in text or 'FAILED' in text.upper():
+            return None
+        return text
     except Exception as e:
-        print(f"❌ akshare 获取失败: {e}")
-        import traceback
-        traceback.print_exc()
-        return results
+        print(f'  请求异常: {e}')
+        return None
 
+def parse_sina(raw, symbol):
+    """
+    解析新浪返回的原始数据
+    新浪期货格式：var hq_str_CU0="名称,最新价,涨跌额,涨跌幅%,今开,最高,最低,昨收,...";
+    """
+    try:
+        start = raw.find('"')
+        end = raw.rfind('"')
+        if start == -1 or end == -1:
+            return None
+        parts = raw[start+1:end].split(',')
+        if len(parts) < 8:
+            return None
+
+        # 字段索引：
+        # 0: 名称（如 "沪铜连续"）
+        # 1: 最新价
+        # 2: 涨跌额
+        # 3: 涨跌幅%（如 "0.50" 或 "--"）
+        # 4: 今开
+        # 5: 最高
+        # 6: 最低
+        # 7: 昨收
+        
+        raw_name = parts[0] if len(parts) > 0 else ''
+        # 提取纯中文名称（去掉"连续"、"主力"等后缀）
+        name_parts = raw_name.split()
+        clean_name = name_parts[0] if name_parts else raw_name
+        
+        # 尝试提取最新价（优先），如果最新价为 0 或无效，则用昨收或今开
+        price = None
+        candidates = [
+            parts[1] if len(parts) > 1 else '',
+            parts[7] if len(parts) > 7 else '',
+            parts[4] if len(parts) > 4 else ''
+        ]
+        for val in candidates:
+            if val and val != '0' and val != '--':
+                try:
+                    p = float(val)
+                    info = SYMBOLS.get(symbol)
+                    if info and info['min_val'] <= p <= info['max_val']:
+                        price = p
+                        break
+                except:
+                    continue
+
+        if price is None:
+            return None
+
+        # 提取其他字段
+        change_val = 0.0
+        if len(parts) > 2 and parts[2] and parts[2] != '0' and parts[2] != '--':
+            try:
+                change_val = float(parts[2])
+            except:
+                pass
+        # 如果涨跌额为 0，尝试用最新价-昨收计算
+        if change_val == 0 and len(parts) > 7 and parts[7]:
+            try:
+                prev_close = float(parts[7])
+                change_val = price - prev_close
+            except:
+                pass
+
+        change_pct_str = '0'
+        if len(parts) > 3 and parts[3]:
+            pct_raw = parts[3].replace('%', '').strip()
+            if pct_raw and pct_raw != '--' and pct_raw != '':
+                try:
+                    # 如果涨跌幅是数字，直接使用
+                    float(pct_raw)
+                    change_pct_str = pct_raw
+                except:
+                    # 如果不是数字，用涨跌额/昨收计算
+                    if len(parts) > 7 and parts[7]:
+                        try:
+                            prev_close = float(parts[7])
+                            if prev_close > 0:
+                                change_pct_str = f"{(change_val / prev_close * 100):.2f}"
+                        except:
+                            pass
+
+        return {
+            'price': price,
+            'change': change_val,
+            'change_pct': change_pct_str,
+            'open': float(parts[4]) if len(parts) > 4 and parts[4] and parts[4] != '0' else price,
+            'high': float(parts[5]) if len(parts) > 5 and parts[5] and parts[5] != '0' else price,
+            'low': float(parts[6]) if len(parts) > 6 and parts[6] and parts[6] != '0' else price,
+            'prev_close': float(parts[7]) if len(parts) > 7 and parts[7] and parts[7] != '0' else price,
+            'name': clean_name
+        }
+    except Exception as e:
+        print(f'  解析异常: {e}')
+        return None
 
 def fetch_all_metals():
-    """主入口：调用 akshare 获取数据"""
-    print('🔄 开始获取金属价格数据 (akshare)')
-    print('=' * 60)
-    return fetch_akshare()
+    results = {}
+    success_count = 0
 
+    print('🔄 开始获取金属价格数据 (新浪财经 HTTP)')
+    print('=' * 60)
+
+    for symbol, info in SYMBOLS.items():
+        print(f'📊 获取 {info["name"]} ({symbol})...', end=' ', flush=True)
+        raw = fetch_sina(symbol)
+        if raw:
+            parsed = parse_sina(raw, symbol)
+            if parsed:
+                results[symbol] = {
+                    'name': info['name'],
+                    'price': parsed['price'],
+                    'unit': info['unit'],
+                    'change': parsed['change'],
+                    'change_pct': parsed['change_pct'],
+                    'open': parsed['open'],
+                    'high': parsed['high'],
+                    'low': parsed['low'],
+                    'prev_close': parsed['prev_close'],
+                }
+                success_count += 1
+                try:
+                    pct = float(parsed['change_pct'])
+                    arrow = '↑' if pct > 0 else '↓' if pct < 0 else '→'
+                    print(f'✅ {parsed["price"]:,.2f} {info["unit"]} {arrow} {abs(pct):.2f}%')
+                except:
+                    print(f'✅ {parsed["price"]:,.2f} {info["unit"]}')
+                continue
+        print('❌')
+        # 避免请求过快被封
+        time.sleep(0.3)
+
+    print('=' * 60)
+    print(f'✅ 成功获取 {success_count}/{len(SYMBOLS)} 个品种')
+    return results
 
 # ============================================================
-# 保存与更新（保持不变）
+# 保存与更新（与原代码相同）
 # ============================================================
 
 def update_latest(data):
@@ -166,14 +208,13 @@ def update_latest(data):
         'timestamp': datetime.utcnow().isoformat() + 'Z',
         'date': datetime.utcnow().strftime('%Y-%m-%d'),
         'time': datetime.now().strftime('%H:%M:%S'),
-        'source': 'akshare (上期所官方数据)',
-        'note': '数据来自上海期货交易所日度结算价',
+        'source': '新浪财经',
+        'note': '数据延迟约15分钟，已进行合理性校验',
         'rates': data
     }
     with open('data/metal_prices.json', 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
     print('✅ 最新价格已保存到 data/metal_prices.json')
-
 
 def update_history(data):
     if not data:
@@ -186,18 +227,15 @@ def update_history(data):
                 history = json.load(f)
         except:
             pass
-
     today = datetime.utcnow().strftime('%Y-%m-%d')
     history['records'] = [r for r in history['records'] if r.get('date') != today]
     history['records'].append({'date': today, 'rates': data})
     history['records'] = sorted(history['records'], key=lambda x: x['date'])
     cutoff = (datetime.utcnow() - timedelta(days=HISTORY_DAYS)).strftime('%Y-%m-%d')
     history['records'] = [r for r in history['records'] if r['date'] >= cutoff]
-
     with open(history_file, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
     print(f'✅ 历史记录已保存 (共 {len(history["records"])} 条)')
-
 
 def print_summary(data):
     if not data:
@@ -205,7 +243,7 @@ def print_summary(data):
     print('\n' + '=' * 60)
     print('📊 行情汇总')
     print('=' * 60)
-    for code, info in data.items():
+    for symbol, info in data.items():
         try:
             pct = float(info['change_pct'])
             arrow = '↑' if pct > 0 else '↓' if pct < 0 else '→'
@@ -214,10 +252,9 @@ def print_summary(data):
             print(f'  {info["name"]}：{info["price"]:,.2f} {info["unit"]}')
     print('=' * 60)
 
-
 def main():
     print('=' * 60)
-    print('📊 金属期货价格获取工具 (akshare)')
+    print('📊 金属期货价格获取工具 (新浪财经 HTTP)')
     print('=' * 60)
     print(f'⏰ 获取时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     print('')
@@ -231,7 +268,6 @@ def main():
     update_history(data)
     print_summary(data)
     print('\n🎉 任务完成！')
-
 
 if __name__ == '__main__':
     main()

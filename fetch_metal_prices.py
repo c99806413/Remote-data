@@ -1,26 +1,25 @@
 import requests
 import json
 import os
-import re
 from datetime import datetime, timedelta
 
 # ============================================================
-# 配置：定义需要抓取的品种及对应的合理价格区间
+# 配置：品种名称映射 + 单位 + 合理区间
 # ============================================================
-SYMBOLS = {
-    '黄金': {'code': 'AU', 'name': '沪金', 'unit': '元/克', 'min_val': 800, 'max_val': 1000},
-    '白银': {'code': 'AG', 'name': '沪银', 'unit': '元/千克', 'min_val': 14000, 'max_val': 18000},
-    '铜':   {'code': 'CU', 'name': '沪铜', 'unit': '元/吨', 'min_val': 60000, 'max_val': 90000},
-    '铝':   {'code': 'AL', 'name': '沪铝', 'unit': '元/吨', 'min_val': 16000, 'max_val': 25000},
-    '锌':   {'code': 'ZN', 'name': '沪锌', 'unit': '元/吨', 'min_val': 18000, 'max_val': 30000},
-    '铅':   {'code': 'PB', 'name': '沪铅', 'unit': '元/吨', 'min_val': 14000, 'max_val': 22000},
-    '镍':   {'code': 'NI', 'name': '沪镍', 'unit': '元/吨', 'min_val': 100000, 'max_val': 200000},
-    '锡':   {'code': 'SN', 'name': '沪锡', 'unit': '元/吨', 'min_val': 150000, 'max_val': 300000},
-    '螺纹钢': {'code': 'RB', 'name': '螺纹钢', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4000},
-    '热轧卷板': {'code': 'HC', 'name': '热轧卷板', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
-    '线材': {'code': 'WR', 'name': '线材', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
-    '不锈钢': {'code': 'SS', 'name': '不锈钢', 'unit': '元/吨', 'min_val': 12000, 'max_val': 20000},
-    '氧化铝': {'code': 'AO', 'name': '氧化铝', 'unit': '元/吨', 'min_val': 2500, 'max_val': 5000},
+SYMBOL_MAP = {
+    'au_f': {'code': 'AU', 'name': '沪金', 'unit': '元/克', 'min_val': 800, 'max_val': 1000},
+    'ag_f': {'code': 'AG', 'name': '沪银', 'unit': '元/千克', 'min_val': 14000, 'max_val': 18000},
+    'cu_f': {'code': 'CU', 'name': '沪铜', 'unit': '元/吨', 'min_val': 60000, 'max_val': 90000},
+    'al_f': {'code': 'AL', 'name': '沪铝', 'unit': '元/吨', 'min_val': 16000, 'max_val': 25000},
+    'zn_f': {'code': 'ZN', 'name': '沪锌', 'unit': '元/吨', 'min_val': 18000, 'max_val': 30000},
+    'pb_f': {'code': 'PB', 'name': '沪铅', 'unit': '元/吨', 'min_val': 14000, 'max_val': 22000},
+    'ni_f': {'code': 'NI', 'name': '沪镍', 'unit': '元/吨', 'min_val': 100000, 'max_val': 200000},
+    'sn_f': {'code': 'SN', 'name': '沪锡', 'unit': '元/吨', 'min_val': 150000, 'max_val': 300000},
+    'rb_f': {'code': 'RB', 'name': '螺纹钢', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4000},
+    'hc_f': {'code': 'HC', 'name': '热轧卷板', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
+    'wr_f': {'code': 'WR', 'name': '线材', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
+    'ss_f': {'code': 'SS', 'name': '不锈钢', 'unit': '元/吨', 'min_val': 12000, 'max_val': 20000},
+    'ao_f': {'code': 'AO', 'name': '氧化铝', 'unit': '元/吨', 'min_val': 2500, 'max_val': 5000},
 }
 
 HISTORY_DAYS = 365
@@ -30,115 +29,113 @@ HISTORY_DAYS = 365
 # ============================================================
 
 def fetch_shfe():
-    """抓取上期所日度数据页面，解析所有品种的主力合约"""
-    url = 'https://www.shfe.cn/reports/tradedata/dailyandweeklydata/'
+    today = datetime.now().strftime("%Y%m%d")
+    url = f"https://www.shfe.cn/data/tradedata/future/dailydata/kx{today}.dat"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://www.shfe.cn/'
     }
     
-    print(f'📡 正在请求上期所数据...')
+    print(f'📡 请求上期所数据: {url}')
     try:
-        resp = requests.get(url, headers=headers, timeout=30)
-        resp.encoding = 'utf-8'
+        resp = requests.get(url, headers=headers, timeout=15)
         if resp.status_code != 200:
-            print(f'❌ HTTP 状态码异常: {resp.status_code}')
+            print(f'❌ HTTP {resp.status_code}')
             return None
-        html = resp.text
+        data = resp.json()
+        print(f'✅ 数据获取成功')
     except Exception as e:
-        print(f'❌ 网络请求失败: {e}')
+        print(f'❌ 请求失败: {e}')
         return None
 
-    print(f'✅ 页面获取成功 (长度: {len(html)} 字符)')
+    products = data.get('o_curproduct', [])
+    if not products:
+        print('❌ 未找到品种数据')
+        return None
+
     results = {}
-
-    # 遍历配置中的每个品种
-    for product_name, info in SYMBOLS.items():
-        print(f'🔍 正在解析: {product_name}...', end=' ')
-        
-        # 1. 截取该品种的数据区块
-        # 注意：页面中是 "商品名称黄金" 无冒号，且后面紧跟换行
-        pattern_block = rf'商品名称{product_name}\s*\n(.*?)(?=商品名称|小计|$)'
-        block_match = re.search(pattern_block, html, re.DOTALL)
-        if not block_match:
-            print('❌ 未找到数据区块')
+    for item in products:
+        product_id = item.get('PRODUCTID', '')
+        if product_id not in SYMBOL_MAP:
             continue
         
-        block_text = block_match.group(1)
+        info = SYMBOL_MAP[product_id]
         
-        # 2. 匹配该区块中的所有合约行
-        # 格式示例: 2608  905.48  911.56  918.50  907.00  133396  12164570.33  136061  1013
-        # 字段: 合约 | 前结算 | 开盘 | 最高 | 最低 | 收盘 | 成交手 | 成交额(万) | 持仓手 | 持仓变化
-        # 注意：成交量和持仓量可能包含逗号(如 133,396)
-        line_pattern = r'(\d{4})\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d,]+)\s+([\d,.]+)\s+([\d,]+)\s+([\d-]+)'
-        matches = re.findall(line_pattern, block_text)
+        # 提取价格字段，优先用均价，次选收盘价，再取开盘价
+        price = None
+        avg_price = item.get('AVGPRICE', '')
+        close_price = item.get('CLOSEPRICE', '')
+        open_price = item.get('OPENPRICE', '')
         
-        if not matches:
-            print('❌ 未找到合约行数据')
-            continue
-
-        # 3. 挑选主力合约：成交量(索引6)最大的那行
-        main_contract = None
-        max_volume = 0
-        for match in matches:
+        if avg_price and avg_price != '':
             try:
-                # 去掉逗号并转为整数
-                volume = int(match[6].replace(',', ''))
-                if volume > max_volume:
-                    max_volume = volume
-                    main_contract = match
+                price = float(avg_price)
             except:
-                continue
-
-        if not main_contract:
-            print('❌ 无法解析成交量')
+                pass
+        if price is None and close_price and close_price != '':
+            try:
+                price = float(close_price)
+            except:
+                pass
+        if price is None and open_price and open_price != '':
+            try:
+                price = float(open_price)
+            except:
+                pass
+        
+        if price is None:
+            print(f'⚠️ {info["name"]} 无有效价格')
             continue
-
-        # 4. 提取数据
-        try:
-            contract_code = main_contract[0]
-            close_price = float(main_contract[5])
-            open_price = float(main_contract[2])
-            high_price = float(main_contract[3])
-            low_price = float(main_contract[4])
-            prev_close = float(main_contract[1])
-            volume = int(main_contract[6].replace(',', ''))
-            
-            # 计算涨跌额和涨跌幅
-            change = close_price - prev_close
-            change_pct = (change / prev_close * 100) if prev_close > 0 else 0
-            
-            # 5. 合理性校验
-            if not (info['min_val'] <= close_price <= info['max_val']):
-                print(f'⚠️ 价格 {close_price} 超出合理区间，跳过')
-                continue
-
-            # 存入结果
-            code = info['code']
-            results[code] = {
-                'name': info['name'],
-                'price': close_price,
-                'unit': info['unit'],
-                'change': change,
-                'change_pct': f"{change_pct:.2f}",
-                'open': open_price,
-                'high': high_price,
-                'low': low_price,
-                'prev_close': prev_close,
-                'volume': volume,
-                'contract': contract_code,
-            }
-            arrow = '↑' if change_pct > 0 else '↓' if change_pct < 0 else '→'
-            print(f'✅ {close_price:.2f} (主力: {contract_code}) {arrow} {abs(change_pct):.2f}%')
-            
-        except Exception as e:
-            print(f'❌ 解析失败: {e}')
-
-    print(f'📊 共成功解析 {len(results)} 个品种')
+        
+        # 合理性校验
+        if not (info['min_val'] <= price <= info['max_val']):
+            print(f'⚠️ {info["name"]} 价格 {price} 超出合理区间，跳过')
+            continue
+        
+        # 提取其他字段
+        prev_close = item.get('PRECLOSEPRICE', '')
+        prev_close = float(prev_close) if prev_close and prev_close != '' else price
+        
+        high = item.get('HIGHESTPRICE', '')
+        high = float(high) if high and high != '' else price
+        
+        low = item.get('LOWESTPRICE', '')
+        low = float(low) if low and low != '' else price
+        
+        open_price = float(open_price) if open_price and open_price != '' else price
+        
+        # 计算涨跌
+        change = price - prev_close
+        change_pct = (change / prev_close * 100) if prev_close > 0 else 0
+        
+        results[info['code']] = {
+            'name': info['name'],
+            'price': price,
+            'unit': info['unit'],
+            'change': change,
+            'change_pct': f"{change_pct:.2f}",
+            'open': open_price,
+            'high': high,
+            'low': low,
+            'prev_close': prev_close,
+            'volume': item.get('VOLUME', 0),
+        }
+        arrow = '↑' if change_pct > 0 else '↓' if change_pct < 0 else '→'
+        print(f'  ✅ {info["name"]}: {price:.2f} {info["unit"]} {arrow} {abs(change_pct):.2f}%')
+    
+    print(f'📊 共获取 {len(results)} 个品种')
     return results
 
+def fetch_all_metals():
+    print('=' * 60)
+    print('📊 金属期货价格获取工具 (上期所官方接口)')
+    print('=' * 60)
+    print(f'⏰ 运行时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+    print('')
+    return fetch_shfe()
+
 # ============================================================
-# 保存与更新逻辑（保持与原有格式完全一致）
+# 保存与更新（与之前完全一致）
 # ============================================================
 
 def update_latest(data):
@@ -150,7 +147,7 @@ def update_latest(data):
         'date': datetime.utcnow().strftime('%Y-%m-%d'),
         'time': datetime.now().strftime('%H:%M:%S'),
         'source': '上海期货交易所 (SHFE)',
-        'note': '数据来自上期所日度结算价，T+1更新，已自动选取主力合约',
+        'note': '数据来自上期所日度结算价，使用加权均价',
         'rates': data
     }
     with open('data/metal_prices.json', 'w', encoding='utf-8') as f:
@@ -176,7 +173,7 @@ def update_history(data):
     history['records'] = [r for r in history['records'] if r['date'] >= cutoff]
     with open(history_file, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
-    print(f'✅ 已更新 data/metal_history.json (共 {len(history["records"])} 条记录)')
+    print(f'✅ 已更新 data/metal_history.json (共 {len(history["records"])} 条)')
 
 def print_summary(data):
     if not data:
@@ -194,17 +191,10 @@ def print_summary(data):
     print('=' * 60)
 
 def main():
-    print('=' * 60)
-    print('📊 金属期货价格获取工具 (上期所 SHFE)')
-    print('=' * 60)
-    print(f'⏰ 运行时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
-    print('')
-
-    data = fetch_shfe()
+    data = fetch_all_metals()
     if not data:
-        print('❌ 未获取到任何有效数据，请检查网络或页面结构')
+        print('❌ 未获取到任何有效数据')
         return
-
     update_latest(data)
     update_history(data)
     print_summary(data)

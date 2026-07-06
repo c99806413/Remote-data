@@ -18,7 +18,7 @@ SYMBOL_MAP = {
     'rb_f': {'code': 'RB', 'name': '螺纹钢', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4000},
     'hc_f': {'code': 'HC', 'name': '热轧卷板', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
     'wr_f': {'code': 'WR', 'name': '线材', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
-    'ss_f': {'code': 'SS', 'name': '不锈钢', 'unit': '元/吨', 'min_val': 12000, 'max_val': 20000},
+    'ss_f': {'code': 'SS', 'name': '304#不锈钢', 'unit': '元/吨', 'min_val': 12000, 'max_val': 20000},
     'ao_f': {'code': 'AO', 'name': '氧化铝', 'unit': '元/吨', 'min_val': 2500, 'max_val': 5000},
 }
 

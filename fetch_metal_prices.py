@@ -8,69 +8,94 @@ import pandas as pd
 # 配置
 # ============================================================
 
-# 品种代码映射（akshare 中的品种代码 → 显示名称 + 单位 + 合理区间）
-# akshare 返回的 product 字段是小写代码
+# 品种代码映射（akshare 返回的 product 字段是大写代码，如 'CU', 'AU', 'AG'）
 SYMBOLS = {
-    'cu': {'name': '沪铜', 'unit': '元/吨', 'min_val': 60000, 'max_val': 90000},
-    'al': {'name': '沪铝', 'unit': '元/吨', 'min_val': 16000, 'max_val': 25000},
-    'zn': {'name': '沪锌', 'unit': '元/吨', 'min_val': 18000, 'max_val': 30000},
-    'pb': {'name': '沪铅', 'unit': '元/吨', 'min_val': 14000, 'max_val': 22000},
-    'ni': {'name': '沪镍', 'unit': '元/吨', 'min_val': 100000, 'max_val': 200000},
-    'sn': {'name': '沪锡', 'unit': '元/吨', 'min_val': 150000, 'max_val': 300000},
-    'au': {'name': '沪金', 'unit': '元/克', 'min_val': 800, 'max_val': 1000},      # ✅ 黄金
-    'ag': {'name': '沪银', 'unit': '元/千克', 'min_val': 14000, 'max_val': 18000}, # ✅ 白银
-    'rb': {'name': '螺纹钢', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4000},
-    'hc': {'name': '热轧卷板', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
-    'wr': {'name': '线材', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
-    'i': {'name': '铁矿石', 'unit': '元/吨', 'min_val': 600, 'max_val': 1000},
-    'ss': {'name': '不锈钢', 'unit': '元/吨', 'min_val': 12000, 'max_val': 20000},
-    'si': {'name': '工业硅', 'unit': '元/吨', 'min_val': 10000, 'max_val': 20000},
-    'lc': {'name': '碳酸锂', 'unit': '元/吨', 'min_val': 50000, 'max_val': 150000},
-    'ao': {'name': '氧化铝', 'unit': '元/吨', 'min_val': 2500, 'max_val': 5000},
+    'CU': {'name': '沪铜', 'unit': '元/吨', 'min_val': 60000, 'max_val': 90000},
+    'AL': {'name': '沪铝', 'unit': '元/吨', 'min_val': 16000, 'max_val': 25000},
+    'ZN': {'name': '沪锌', 'unit': '元/吨', 'min_val': 18000, 'max_val': 30000},
+    'PB': {'name': '沪铅', 'unit': '元/吨', 'min_val': 14000, 'max_val': 22000},
+    'NI': {'name': '沪镍', 'unit': '元/吨', 'min_val': 100000, 'max_val': 200000},
+    'SN': {'name': '沪锡', 'unit': '元/吨', 'min_val': 150000, 'max_val': 300000},
+    'AU': {'name': '沪金', 'unit': '元/克', 'min_val': 800, 'max_val': 1000},       # ✅ 黄金
+    'AG': {'name': '沪银', 'unit': '元/千克', 'min_val': 14000, 'max_val': 18000},  # ✅ 白银
+    'RB': {'name': '螺纹钢', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4000},
+    'HC': {'name': '热轧卷板', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
+    'WR': {'name': '线材', 'unit': '元/吨', 'min_val': 2800, 'max_val': 4200},
+    'I': {'name': '铁矿石', 'unit': '元/吨', 'min_val': 600, 'max_val': 1000},
+    'SS': {'name': '不锈钢', 'unit': '元/吨', 'min_val': 12000, 'max_val': 20000},
+    'SI': {'name': '工业硅', 'unit': '元/吨', 'min_val': 10000, 'max_val': 20000},
+    'LC': {'name': '碳酸锂', 'unit': '元/吨', 'min_val': 50000, 'max_val': 150000},
+    'AO': {'name': '氧化铝', 'unit': '元/吨', 'min_val': 2500, 'max_val': 5000},
 }
 
-# 主力合约代码（akshare 中查询时用）
-# 格式：品种代码 + 主力月份，如 cu 的主力是 cu2508
-# 也可以直接用 'CU0' 这种新浪代码，但 akshare 需要的是具体合约或连续合约标识
-# 使用 akshare 的 futures_daily_bar 接口，传入 'CU' 这种简写即可
 HISTORY_DAYS = 365
 
 # ============================================================
-# 核心获取函数（使用 akshare）
+# 核心获取函数（使用 akshare get_futures_daily）
 # ============================================================
 
 def fetch_akshare():
     """
-    使用 akshare 获取上期所所有品种的日度数据
-    返回字典：{ 'cu': {'price': xxx, 'change': xxx, ...}, ... }
+    使用 akshare 的 get_futures_daily 获取上期所日度数据
     """
     results = {}
     
-    # 获取最近一个交易日（akshare 会自动返回最新交易日的数据）
-    # 使用 futures_daily_bar 获取上期所所有品种的日度数据
     try:
-        # 获取上期所日度数据（返回所有品种）
-        df = ak.futures_daily_bar(market="SHFE")
+        # 获取最近一个交易日的数据
+        # 日期格式可以是 "YYYYMMDD" 或 "YYYY-MM-DD"
+        today = datetime.now()
+        end_date = today.strftime("%Y%m%d")
+        # 往前推5天，确保覆盖到最近一个交易日
+        start_date = (today - timedelta(days=10)).strftime("%Y%m%d")
+        
+        print(f"📅 获取日期范围: {start_date} 至 {end_date}")
+        print("📊 正在调用 get_futures_daily(market='SHFE')...")
+        
+        # 正确的函数名是 get_futures_daily[reference:4]
+        df = ak.get_futures_daily(
+            start_date=start_date,
+            end_date=end_date,
+            market="SHFE"  # 上期所
+        )
+        
         if df is None or df.empty:
-            print("❌ akshare 返回空数据")
+            print("❌ get_futures_daily 返回空数据")
             return results
         
         print(f"✅ 成功获取 {len(df)} 条数据记录")
         print(f"📋 数据字段: {df.columns.tolist()}")
-        print(f"📋 品种列表: {df['product'].unique().tolist()}")
         
-        # 按品种分组，取每个品种的最新一条记录（主力合约）
-        # 通常每个品种有多个月份合约，我们取成交量最大的作为主力
-        df_latest = df.sort_values(['product', 'volume'], ascending=[True, False])
-        df_main = df_latest.drop_duplicates(subset=['product'], keep='first')
+        # 获取所有品种列表
+        products = df['product'].unique().tolist() if 'product' in df.columns else []
+        print(f"📋 品种列表: {products}")
         
-        print(f"📋 主力合约品种: {df_main['product'].tolist()}")
+        # 获取最新日期
+        if 'date' in df.columns:
+            latest_date = df['date'].max()
+            print(f"📅 最新数据日期: {latest_date}")
+            # 只保留最新一天的数据
+            df_latest = df[df['date'] == latest_date]
+        else:
+            # 如果没有 date 列，按日期索引取最后一天
+            df_latest = df.groupby('product').last().reset_index()
         
-        # 遍历每个品种，提取数据
+        # 按品种分组，取每个品种的最新记录
+        # 如果有多个合约，取成交量最大的作为主力
+        if 'volume' in df_latest.columns:
+            df_main = df_latest.sort_values(['product', 'volume'], ascending=[True, False])
+            df_main = df_main.drop_duplicates(subset=['product'], keep='first')
+        else:
+            df_main = df_latest.drop_duplicates(subset=['product'], keep='first')
+        
+        print(f"📋 主力合约品种: {df_main['product'].tolist() if 'product' in df_main.columns else '未知'}")
+        
+        # 遍历每个品种
         for _, row in df_main.iterrows():
-            code = row['product']  # 小写代码，如 'cu', 'au', 'ag'
+            code = row['product']  # 大写代码，如 'CU', 'AU', 'AG'
+            
+            # 只处理我们配置的品种
             if code not in SYMBOLS:
-                continue  # 只处理我们配置的品种
+                continue
             
             info = SYMBOLS[code]
             
@@ -98,16 +123,23 @@ def fetch_akshare():
                     'high': high,
                     'low': low,
                     'prev_close': prev_close,
-                    'volume': volume,  # 额外保留成交量
-                    'contract': row.get('symbol', ''),  # 合约代码
+                    'volume': volume,
+                    'contract': row.get('symbol', ''),
+                    'date': row.get('date', '')
                 }
-                print(f"  ✅ {info['name']}: {price:.2f} {info['unit']} (涨跌幅: {change_pct:.2f}%)")
+                arrow = '↑' if change_pct > 0 else '↓' if change_pct < 0 else '→'
+                print(f"  ✅ {info['name']}: {price:.2f} {info['unit']} {arrow} {abs(change_pct):.2f}%")
             else:
                 print(f"  ⚠️ {info['name']} 价格 {price} 超出合理区间 [{info['min_val']}, {info['max_val']}]，跳过")
         
         print(f"✅ 成功获取 {len(results)} 个品种的数据")
         return results
         
+    except AttributeError as e:
+        print(f"❌ 函数不存在: {e}")
+        print("💡 请确认 akshare 版本: pip show akshare")
+        print("💡 如果版本过旧，请升级: pip install akshare --upgrade")
+        return results
     except Exception as e:
         print(f"❌ akshare 获取失败: {e}")
         import traceback
@@ -123,7 +155,7 @@ def fetch_all_metals():
 
 
 # ============================================================
-# 保存与更新（与原代码相同）
+# 保存与更新（保持不变）
 # ============================================================
 
 def update_latest(data):
@@ -135,7 +167,7 @@ def update_latest(data):
         'date': datetime.utcnow().strftime('%Y-%m-%d'),
         'time': datetime.now().strftime('%H:%M:%S'),
         'source': 'akshare (上期所官方数据)',
-        'note': '数据来自上海期货交易所日度结算价，T+1更新',
+        'note': '数据来自上海期货交易所日度结算价',
         'rates': data
     }
     with open('data/metal_prices.json', 'w', encoding='utf-8') as f:
@@ -156,19 +188,15 @@ def update_history(data):
             pass
 
     today = datetime.utcnow().strftime('%Y-%m-%d')
-    # 删除今天已有的记录（防止重复）
     history['records'] = [r for r in history['records'] if r.get('date') != today]
-    # 添加新记录
     history['records'].append({'date': today, 'rates': data})
-    # 按日期排序
     history['records'] = sorted(history['records'], key=lambda x: x['date'])
-    # 只保留最近 HISTORY_DAYS 天
     cutoff = (datetime.utcnow() - timedelta(days=HISTORY_DAYS)).strftime('%Y-%m-%d')
     history['records'] = [r for r in history['records'] if r['date'] >= cutoff]
 
     with open(history_file, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
-    print(f'✅ 历史记录已保存到 data/metal_history.json (共 {len(history["records"])} 条)')
+    print(f'✅ 历史记录已保存 (共 {len(history["records"])} 条)')
 
 
 def print_summary(data):

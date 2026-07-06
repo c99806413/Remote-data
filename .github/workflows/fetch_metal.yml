@@ -2,8 +2,8 @@ name: 每日获取金属价格
 
 on:
   schedule:
-    - cron: '30 10 * * *'   # 每天 UTC 10:30（北京时间 18:30），交易时段内
-  workflow_dispatch:
+    - cron: '30 8 * * *'   # 每天 UTC 08:30（北京时间 16:30），收盘后执行
+  workflow_dispatch:       # 保留手动触发按钮，方便你测试
 
 jobs:
   fetch:
@@ -22,12 +22,12 @@ jobs:
           pip install --upgrade pip
           pip install requests
 
-      - name: 运行脚本
+      - name: 运行抓取脚本
         run: python fetch_metal_prices.py
 
       - name: 提交更改
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "🤖 自动更新金属价格 (新浪)"
+          commit_message: "🤖 [SHFE] 自动更新金属价格"
           file_pattern: "data/*.json"
           push_options: '--force'

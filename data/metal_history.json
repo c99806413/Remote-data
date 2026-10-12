@@ -12549,6 +12549,167 @@
           "volume": 196175
         }
       }
+    },
+    {
+      "date": "2026-10-12",
+      "rates": {
+        "CU": {
+          "name": "沪铜",
+          "price": 110634.453,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 110634.453,
+          "high": 111950.0,
+          "low": 108650.0,
+          "prev_close": 110634.453,
+          "volume": 148226
+        },
+        "AL": {
+          "name": "沪铝",
+          "price": 23501.552,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 23501.552,
+          "high": 23775.0,
+          "low": 22985.0,
+          "prev_close": 23501.552,
+          "volume": 382748
+        },
+        "ZN": {
+          "name": "沪锌",
+          "price": 26181.431,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 26181.431,
+          "high": 26295.0,
+          "low": 26025.0,
+          "prev_close": 26181.431,
+          "volume": 174731
+        },
+        "PB": {
+          "name": "沪铅",
+          "price": 16076.618,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 16076.618,
+          "high": 16250.0,
+          "low": 16020.0,
+          "prev_close": 16076.618,
+          "volume": 90264
+        },
+        "NI": {
+          "name": "沪镍",
+          "price": 118744.464,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 118744.464,
+          "high": 122030.0,
+          "low": 117300.0,
+          "prev_close": 118744.464,
+          "volume": 229010
+        },
+        "SN": {
+          "name": "沪锡",
+          "price": 397848.85,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 397848.85,
+          "high": 400500.0,
+          "low": 393450.0,
+          "prev_close": 397848.85,
+          "volume": 144870
+        },
+        "AO": {
+          "name": "氧化铝",
+          "price": 2697.757,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 2697.757,
+          "high": 2831.0,
+          "low": 2614.0,
+          "prev_close": 2697.757,
+          "volume": 134336
+        },
+        "AU": {
+          "name": "沪金",
+          "price": 908.505,
+          "unit": "元/克",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 908.505,
+          "high": 924.32,
+          "low": 902.42,
+          "prev_close": 908.505,
+          "volume": 212737
+        },
+        "AG": {
+          "name": "沪银",
+          "price": 14869.581,
+          "unit": "元/千克",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 14869.581,
+          "high": 15145.0,
+          "low": 14661.0,
+          "prev_close": 14869.581,
+          "volume": 451601
+        },
+        "RB": {
+          "name": "螺纹钢",
+          "price": 3095.133,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 3095.133,
+          "high": 3147.0,
+          "low": 3004.0,
+          "prev_close": 3095.133,
+          "volume": 641330
+        },
+        "WR": {
+          "name": "线材",
+          "price": 3426.56,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 3426.56,
+          "high": 3446.0,
+          "low": 3408.0,
+          "prev_close": 3426.56,
+          "volume": 25
+        },
+        "HC": {
+          "name": "热轧卷板",
+          "price": 3265.812,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 3265.812,
+          "high": 3298.0,
+          "low": 3218.0,
+          "prev_close": 3265.812,
+          "volume": 434206
+        },
+        "SS": {
+          "name": "304#不锈钢",
+          "price": 13494.223,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 13494.223,
+          "high": 13790.0,
+          "low": 13390.0,
+          "prev_close": 13494.223,
+          "volume": 182044
+        }
+      }
     }
   ]
 }

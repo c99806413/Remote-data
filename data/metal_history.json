@@ -16322,6 +16322,155 @@
           "volume": 228832
         }
       }
+    },
+    {
+      "date": "2026-11-16",
+      "rates": {
+        "CU": {
+          "name": "沪铜",
+          "price": 102049.03,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 102049.03,
+          "high": 118060.0,
+          "low": 98000.0,
+          "prev_close": 102049.03,
+          "volume": 348085
+        },
+        "AL": {
+          "name": "沪铝",
+          "price": 21909.606,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 21909.606,
+          "high": 23000.0,
+          "low": 20750.0,
+          "prev_close": 21909.606,
+          "volume": 719837
+        },
+        "ZN": {
+          "name": "沪锌",
+          "price": 24899.548,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 24899.548,
+          "high": 25750.0,
+          "low": 24505.0,
+          "prev_close": 24899.548,
+          "volume": 319003
+        },
+        "PB": {
+          "name": "沪铅",
+          "price": 15932.387,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 15932.387,
+          "high": 16135.0,
+          "low": 15570.0,
+          "prev_close": 15932.387,
+          "volume": 124217
+        },
+        "NI": {
+          "name": "沪镍",
+          "price": 120893.682,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 120893.682,
+          "high": 126670.0,
+          "low": 119200.0,
+          "prev_close": 120893.682,
+          "volume": 293404
+        },
+        "SN": {
+          "name": "沪锡",
+          "price": 344979.551,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 344979.551,
+          "high": 355820.0,
+          "low": 323980.0,
+          "prev_close": 344979.551,
+          "volume": 347741
+        },
+        "AO": {
+          "name": "氧化铝",
+          "price": 2609.576,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 2609.576,
+          "high": 2760.0,
+          "low": 2565.0,
+          "prev_close": 2609.576,
+          "volume": 392682
+        },
+        "AU": {
+          "name": "沪金",
+          "price": 834.587,
+          "unit": "元/克",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 834.587,
+          "high": 851.94,
+          "low": 824.2,
+          "prev_close": 834.587,
+          "volume": 472272
+        },
+        "RB": {
+          "name": "螺纹钢",
+          "price": 3022.218,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 3022.218,
+          "high": 3070.0,
+          "low": 2935.0,
+          "prev_close": 3022.218,
+          "volume": 840541
+        },
+        "WR": {
+          "name": "线材",
+          "price": 3300.4,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 3300.4,
+          "high": 3351.0,
+          "low": 3278.0,
+          "prev_close": 3300.4,
+          "volume": 15
+        },
+        "HC": {
+          "name": "热轧卷板",
+          "price": 3168.505,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 3168.505,
+          "high": 3225.0,
+          "low": 3091.0,
+          "prev_close": 3168.505,
+          "volume": 532815
+        },
+        "SS": {
+          "name": "304#不锈钢",
+          "price": 13946.117,
+          "unit": "元/吨",
+          "change": 0.0,
+          "change_pct": "0.00",
+          "open": 13946.117,
+          "high": 14200.0,
+          "low": 13790.0,
+          "prev_close": 13946.117,
+          "volume": 258253
+        }
+      }
     }
   ]
 }
